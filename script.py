@@ -12,6 +12,10 @@
 #!/usr/bin/env python3
 import RPi.GPIO as GPIO
 import time
+from datetime import datetime
+from sns_formatter import SnsFormatter
+import os
+import json
 
 DHTPIN = 4
 
@@ -24,6 +28,9 @@ STATE_INIT_PULL_UP = 2
 STATE_DATA_FIRST_PULL_DOWN = 3
 STATE_DATA_PULL_UP = 4
 STATE_DATA_PULL_DOWN = 5
+
+last_sns_message_time = datetime.now()
+
 
 def read_dht11_dat():
 	GPIO.setup(DHTPIN, GPIO.OUT)
@@ -116,14 +123,34 @@ def read_dht11_dat():
 
 	return the_bytes[0], the_bytes[2]
 
+def publish_to_sns(snsItem):
+    if type(snsItem) is not SnsFormatter:
+        raise Exception("Wrong snsItem format")
+    global last_sns_message_time
+    difference = datetime.now() - last_sns_message_time
+    if difference.total_seconds() >= 5:
+        SNS_BASH_CMD = "aws sns publish --topic-arn arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification --message \"%s\""
+        message = json.dumps(snsItem.__dict__)
+        os.system(SNS_BASH_CMD % message)
+        last_sns_message_time = datetime.now()
+
 def main():
-	print ("Raspberry Pi wiringPi DHT11 Temperature test program\n")
-	while True:
-		result = read_dht11_dat()
-		if result:
-			humidity, temperature = result
-			print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
-		time.sleep(1)
+    while True:
+        result = read_dht11_dat()
+        if result:
+            humidity, temperature = result
+            print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
+            if int(humidity) >= 70: #70% humidity
+                publish_to_sns(SnsFormatter(
+                    SnsFormatter.Events.WARNING,
+                    SnsFormatter.Sensors.HUMIDITY,
+                    int(humidity)))
+            if int(temperature) >= 26: #26 degrees Celsius
+                publish_to_sns(SnsFormatter(
+                    SnsFormatter.Events.WARNING,
+                    SnsFormatter.Sensors.TEMPERATURE,
+                    int(temperature)))
+        time.sleep(1)
 
 def destroy():
 	GPIO.cleanup()
