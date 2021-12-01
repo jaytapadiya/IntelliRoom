@@ -17,9 +17,16 @@ from sns_formatter import SnsFormatter
 import os
 import json
 
-DHTPIN = 4
+DHTPIN = 6 #HUMITURE SENSOR
+MOTION_SENSOR_1_PIN = 25
+MOTION_SENSOR_2_PIN = 17
+FLAME_SENSOR_PIN = 2
+GAS_SENSOR_PIN = 3
+SOUND_SENSOR_PIN = 27
 
 GPIO.setmode(GPIO.BCM)
+IO.setup(MOTION_SENSOR_1_PIN,IO.IN)
+IO.setup(MOTION_SENSOR_2_PIN,IO.IN) 
 
 MAX_UNCHANGE_COUNT = 100
 
@@ -129,27 +136,62 @@ def publish_to_sns(snsItem):
     global last_sns_message_time
     difference = datetime.now() - last_sns_message_time
     if difference.total_seconds() >= 5:
-        SNS_BASH_CMD = "aws sns publish --topic-arn arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification --message \"%s\""
-        message = json.dumps(snsItem.__dict__)
-        os.system(SNS_BASH_CMD % message)
+        #SNS_BASH_CMD = "aws sns publish --topic-arn arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification --message \"%s\""
+        message = messageFormatter(snsItem)
+		print(message)
+        #os.system(SNS_BASH_CMD % message)
         last_sns_message_time = datetime.now()
+
+def messageFormatter(snsItem):
+	outString = "{}: {} sensor".format(snsItem.eventType,snsItem.sensorType.lower())
+	switch = {
+		snsItem.Sensors.TEMPERATURE: " at {} degrees".format(snsItem.sensorValue),
+		snsItem.Sensors.HUMIDITY: " at {}\% humidity".format(snsItem.sensorValue),
+		snsItem.Sensors.MOTION: " activated",
+		snsItem.Sensors.SOUND: " activated"
+	}
+	outString += switch.get(snsItem.sensorType, "Invalid sensor")
+	return outString
+
+def check_humiture():
+	result = read_dht11_dat()
+	if result:
+		humidity, temperature = result
+		print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
+		if int(humidity) >= 70: #70% humidity
+			return SnsFormatter(
+				SnsFormatter.Events.WARNING,
+				SnsFormatter.Sensors.HUMIDITY,
+				int(humidity))
+		if int(temperature) >= 26: #26 degrees Celsius
+			return SnsFormatter(
+				SnsFormatter.Events.WARNING,
+				SnsFormatter.Sensors.TEMPERATURE,
+				int(temperature))
+	return None
+
+def check_motion_sensor():
+	if(IO.input(MOTION_SENSOR_1_PIN)==True) and (IO.input(MOTION_SENSOR_2_PIN)==True): #object is far away
+		return SnsFormatter(
+			SnsFormatter.Events.INFO,
+			SnsFormatter.Sensors.MOTION)
+	return None
+
+def callback(channel):
+	if not GPIO.input(channel):
+		publish_to_sns(SnsFormatter(SnsFormatter.Events.WARNING, SnsFormatter.Sensors.SOUND))
+
+GPIO.add_event_detect(SOUND_SENSOR_PIN, GPIO.BOTH, bouncetime=30)  # let us know when the pin goes HIGH or LOW
+GPIO.add_event_callback(SOUND_SENSOR_PIN, callback)  # assign function to GPIO PIN, Run function on change
 
 def main():
     while True:
-        result = read_dht11_dat()
-        if result:
-            humidity, temperature = result
-            print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
-            if int(humidity) >= 70: #70% humidity
-                publish_to_sns(SnsFormatter(
-                    SnsFormatter.Events.WARNING,
-                    SnsFormatter.Sensors.HUMIDITY,
-                    int(humidity)))
-            if int(temperature) >= 26: #26 degrees Celsius
-                publish_to_sns(SnsFormatter(
-                    SnsFormatter.Events.WARNING,
-                    SnsFormatter.Sensors.TEMPERATURE,
-                    int(temperature)))
+        humiture = check_humiture()
+		if humiture: 
+			publish_to_sns(humiture)
+		motion = check_motion_sensor()
+		if motion:
+			publish_to_sns(motion)
         time.sleep(1)
 
 def destroy():
