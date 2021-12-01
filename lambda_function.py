@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
     def can_handle(self, handler_input):
@@ -124,6 +125,7 @@ class IntentReflectorHandler(AbstractRequestHandler):
     for your intents by defining them above, then also adding them to the request
     handler chain below.
     """
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return ask_utils.is_request_type("IntentRequest")(handler_input)
@@ -131,7 +133,7 @@ class IntentReflectorHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         intent_name = ask_utils.get_intent_name(handler_input)
-        speak_output = "You just triggered " + intent_name + "."
+        speak_output = "Asking for " + intent_name + "."
 
         sts_client = boto3.client('sts')
         assumed_role_object=sts_client.assume_role(RoleArn="arn:aws:iam::728853861485:role/SNSLambdaExecutionRole", RoleSessionName="AssumeRoleSession1")
@@ -142,8 +144,15 @@ class IntentReflectorHandler(AbstractRequestHandler):
                       aws_session_token=credentials['SessionToken'],
                       region_name='us-east-1')
                       
+        intent_script = {
+            "food": "Patient needs food",
+            "water_order": "Patient needs water",
+            "bathroom": "Patient needs to use the restroom",
+            "comfort": "Patient is uncomfortable"
+        }
+                      
         sns.publish(TopicArn='arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification',
-            Message=intent_name)
+            Message=intent_script[intent_name])
 
         return (
             handler_input.response_builder
