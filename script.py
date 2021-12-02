@@ -132,15 +132,15 @@ def read_dht11_dat():
 	return the_bytes[0], the_bytes[2]
 
 def publish_to_sns(snsItem):
-    if type(snsItem) is not SnsFormatter:
-        raise Exception("Wrong snsItem format")
+    #if type(snsItem) is not SnsFormatter:
+        #raise Exception("Wrong snsItem format")
     global last_sns_message_time
     difference = datetime.now() - last_sns_message_time
     if difference.total_seconds() >= 5:
-        #SNS_BASH_CMD = "aws sns publish --topic-arn arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification --message \"%s\""
+        SNS_BASH_CMD = "aws sns publish --topic-arn arn:aws:sns:us-east-1:728853861485:IntelliRoomStatusNotification --message \"%s\""
         message = messageFormatter(snsItem)
-		print(message)
-        #os.system(SNS_BASH_CMD % message)
+	print(message)
+        os.system(SNS_BASH_CMD % message)
         last_sns_message_time = datetime.now()
 
 def messageFormatter(snsItem):
@@ -158,7 +158,7 @@ def check_humiture():
 	result = read_dht11_dat()
 	if result:
 		humidity, temperature = result
-		print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
+		#print ("humidity: %s %%,  Temperature: %s C`" % (humidity, temperature))
 		if int(humidity) >= 70: #70% humidity
 			return SnsFormatter(
 				SnsFormatter.Events.WARNING,
@@ -189,11 +189,11 @@ GPIO.add_event_callback(SOUND_SENSOR_PIN, callback)  # assign function to GPIO P
 def main():
     while True:
         humiture = check_humiture()
-		if humiture: 
-			publish_to_sns(humiture)
-		motion = check_motion_sensor()
-		if motion:
-			publish_to_sns(motion)
+	if humiture: 
+            publish_to_sns(humiture)
+	motion = check_motion_sensor()
+        if motion:
+            publish_to_sns(motion)
         time.sleep(0.5)
 
 def destroy():
