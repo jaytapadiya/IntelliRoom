@@ -25,8 +25,9 @@ GAS_SENSOR_PIN = 3
 SOUND_SENSOR_PIN = 27
 
 GPIO.setmode(GPIO.BCM)
-IO.setup(MOTION_SENSOR_1_PIN,IO.IN)
-IO.setup(MOTION_SENSOR_2_PIN,IO.IN) 
+GPIO.setup(MOTION_SENSOR_1_PIN,GPIO.IN)
+GPIO.setup(MOTION_SENSOR_2_PIN,GPIO.IN) 
+GPIO.setup(SOUND_SENSOR_PIN,GPIO.IN)
 
 MAX_UNCHANGE_COUNT = 100
 
@@ -171,15 +172,16 @@ def check_humiture():
 	return None
 
 def check_motion_sensor():
-	if(IO.input(MOTION_SENSOR_1_PIN)==True) and (IO.input(MOTION_SENSOR_2_PIN)==True): #object is far away
+	if(GPIO.input(MOTION_SENSOR_1_PIN)==True) and (GPIO.input(MOTION_SENSOR_2_PIN)==True): #object is far away
 		return SnsFormatter(
 			SnsFormatter.Events.INFO,
-			SnsFormatter.Sensors.MOTION)
+			SnsFormatter.Sensors.MOTION,
+			None)
 	return None
 
 def callback(channel):
 	if not GPIO.input(channel):
-		publish_to_sns(SnsFormatter(SnsFormatter.Events.WARNING, SnsFormatter.Sensors.SOUND))
+		publish_to_sns(SnsFormatter(SnsFormatter.Events.WARNING, SnsFormatter.Sensors.SOUND, None))
 
 GPIO.add_event_detect(SOUND_SENSOR_PIN, GPIO.BOTH, bouncetime=30)  # let us know when the pin goes HIGH or LOW
 GPIO.add_event_callback(SOUND_SENSOR_PIN, callback)  # assign function to GPIO PIN, Run function on change
@@ -192,7 +194,7 @@ def main():
 		motion = check_motion_sensor()
 		if motion:
 			publish_to_sns(motion)
-        time.sleep(1)
+        time.sleep(0.5)
 
 def destroy():
 	GPIO.cleanup()
